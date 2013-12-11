@@ -75,9 +75,9 @@ public class AnswerSearchConnector extends SearchServiceConnector {
     
     List<SearchResult> results = new ArrayList<SearchResult>();
     
-    String asteriskQuery = CommonUtils.processSearchCondition(query);
+    String asteriskQuery = CommonUtils.processLikeCondition(query);
 
-    FAQEventQuery eventQuery = new FAQEventQuery();
+    UnifiedSearchEventQuery eventQuery = new UnifiedSearchEventQuery();
     eventQuery.setType(FAQEventQuery.FAQ_QUESTION);
     eventQuery.setAdmin(false);
     eventQuery.setComment(query);

@@ -35,8 +35,9 @@ import org.exoplatform.services.log.ExoLogger;
 import org.exoplatform.services.log.Log;
 
 /**
- * All questions and their properties, methods are getted from database to view in page will be restore in this class. And ratification, questions can be sorted by alphabet or by date time when
- * quetsion is created.
+ * All questions and their properties, methods are getted from database to view
+ * in page will be restore in this class. And ratification, questions can be
+ * sorted by alphabet or by date time when quetsion is created.
  * 
  * @author Hung Nguyen (hung.nguyen@exoplatform.com)
  * @since Mar 08, 2008
@@ -90,9 +91,13 @@ public class QuestionPageList extends JCRPageList {
   private static Log               log                 = ExoLogger.getLogger(QuestionPageList.class);
 
   /**
-   * Sets the not yet answered. Set parameter is <code>true</code> if want get questions are not yet answered opposite set is <code>false</code> or don't do (default value is <code>false</code>)
+   * Sets the not yet answered. Set parameter is <code>true</code> if want get
+   * questions are not yet answered opposite set is <code>false</code> or don't
+   * do (default value is <code>false</code>)
    * 
-   * @param isNotYetAnswered the new not yet answered, is <code>true</code> if want get questoins not yet answered and is <code>false</code> if opposite
+   * @param isNotYetAnswered the new not yet answered, is <code>true</code> if
+   *          want get questoins not yet answered and is <code>false</code> if
+   *          opposite
    */
   public void setNotYetAnswered(boolean isNotYetAnswered) {
     this.isNotYetAnswered = isNotYetAnswered;
@@ -108,9 +113,14 @@ public class QuestionPageList extends JCRPageList {
   }
 
   /**
-   * get total questions are not yet ansewered. The first, get all questions in faq system then each questions check if property <code>response</code> in default language is <code>null</code> then put
-   * this question into the <code>List</code> else get all children nodes of this question (if it have) and check if one of them is not yet ansewred then put this question into the <code>List</code>
-   * @throws Exception 
+   * get total questions are not yet ansewered. The first, get all questions in
+   * faq system then each questions check if property <code>response</code> in
+   * default language is <code>null</code> then put this question into the
+   * <code>List</code> else get all children nodes of this question (if it have)
+   * and check if one of them is not yet ansewred then put this question into
+   * the <code>List</code>
+   * 
+   * @throws Exception
    */
   private void setTotalQuestion() throws Exception {
     listQuestions_ = new ArrayList<Question>();
@@ -118,7 +128,7 @@ public class QuestionPageList extends JCRPageList {
       Session session = getJCRSession();
       if (isQuery_) {
         QueryManager qm = session.getWorkspace().getQueryManager();
-        Query query = qm.createQuery(value_, Query.XPATH);
+        Query query = qm.createQuery(value_, Query.SQL);
         QueryResult result = query.execute();
         iter_ = result.getNodes();
       } else {
@@ -137,15 +147,19 @@ public class QuestionPageList extends JCRPageList {
       questionNode = nodeIterator.nextNode();
       if (!isOpenQuestion) {// used for question manager.
         try {
-          if (!questionNode.hasNode(ANSWER_HOME) || questionNode.getNode(ANSWER_HOME).getNodes().getSize() < 1) {
-            languages.append(questionNode.getProperty(FAQNodeTypes.EXO_LANGUAGE).getValue().getString());
+          if (!questionNode.hasNode(ANSWER_HOME)
+              || questionNode.getNode(ANSWER_HOME).getNodes().getSize() < 1) {
+            languages.append(questionNode.getProperty(FAQNodeTypes.EXO_LANGUAGE)
+                                         .getValue()
+                                         .getString());
           }
           if (questionNode.hasNode("languages")) {
             languageNode = questionNode.getNode("languages");
             languageIter = languageNode.getNodes();
             while (languageIter.hasNext()) {
               language = languageIter.nextNode();
-              if (!language.hasNode(ANSWER_HOME) || language.getNode(ANSWER_HOME).getNodes().getSize() < 1) {
+              if (!language.hasNode(ANSWER_HOME)
+                  || language.getNode(ANSWER_HOME).getNodes().getSize() < 1) {
                 if (languages.length() > 0)
                   languages.append(",");
                 languages.append(language.getProperty(FAQNodeTypes.EXO_LANGUAGE).getString());
@@ -174,21 +188,27 @@ public class QuestionPageList extends JCRPageList {
 
   private boolean hasAnswerInQuestion(Node questionNode) throws Exception {
     QueryManager qm = questionNode.getSession().getWorkspace().getQueryManager();
-    StringBuffer queryString = new StringBuffer(FAQNodeTypes.JCR_ROOT).append(questionNode.getPath()).append("//element(*,exo:answer)[(@exo:approveResponses='true') and (@exo:activateResponses='true')]");
-    Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+    StringBuilder queryString = Utils.createSQLQueryByPath(FAQNodeTypes.EXO_ANSWER, questionNode.getPath(), false);
+    queryString.append(" AND ")
+               .append(FAQNodeTypes.EXO_ACTIVATE_RESPONSES)
+               .append(" = 'true' AND ")
+               .append(FAQNodeTypes.EXO_APPROVE_RESPONSES)
+               .append(" = 'true'");
+    Query query = qm.createQuery(queryString.toString(), Query.SQL);
     QueryResult result = query.execute();
     NodeIterator iter = result.getNodes();
     return (iter.getSize() > 0) ? true : false;
   }
 
   /**
-   * Class constructor specifying iter contain quetion nodes, value, it's query or not, how to sort all question.
+   * Class constructor specifying iter contain quetion nodes, value, it's query
+   * or not, how to sort all question.
    * 
    * @param iter NodeIterator use to store question nodes
    * @param pageSize this param is used to set number of question per page
    * @param value query string is used to get question node
-   * @param isQuery is <code>true</code> is param value is query string and is <code>false</code> if opposite
-   * 
+   * @param isQuery is <code>true</code> is param value is query string and is
+   *          <code>false</code> if opposite
    * @throws Exception if repository occur exception
    */
   public QuestionPageList(NodeIterator iter, long pageSize, String value, boolean isQuery) throws Exception {
@@ -205,7 +225,6 @@ public class QuestionPageList extends JCRPageList {
    * 
    * @param faqFormSearchs the faq form searchs
    * @param pageSize the page size
-   * 
    */
   public QuestionPageList(List<ObjectSearchResult> faqFormSearchs, long pageSize) {
     super(pageSize);
@@ -219,7 +238,6 @@ public class QuestionPageList extends JCRPageList {
    * 
    * @param listWatch the list watch
    * @param page the page
-   * 
    * @throws Exception the exception
    */
   public QuestionPageList(List<Watch> listWatch, double page) throws Exception {
@@ -233,7 +251,6 @@ public class QuestionPageList extends JCRPageList {
    * Instantiates a new question page list.
    * 
    * @param listCategories the list categories
-   * 
    * @throws Exception the exception
    */
   public QuestionPageList(List<Category> listCategories) throws Exception {
@@ -248,7 +265,6 @@ public class QuestionPageList extends JCRPageList {
    * 
    * @param listQuestions the list questions
    * @param size the size
-   * 
    * @throws Exception the exception
    */
   public QuestionPageList(List<Question> listQuestions, int size) throws Exception {
@@ -265,10 +281,12 @@ public class QuestionPageList extends JCRPageList {
    * @param quesQuerry the ques querry
    * @param listObject the list object
    * @param setting the setting
-   * 
    * @throws Exception the exception
    */
-  public QuestionPageList(Node categoryNode, String quesQuerry, List<Object> listObject, FAQSetting setting) throws Exception {
+  public QuestionPageList(Node categoryNode,
+                          String quesQuerry,
+                          List<Object> listObject,
+                          FAQSetting setting) throws Exception {
     super(10);
     this.sessionManager = FAQServiceUtils.getSessionManager();
     this.questionQuery_ = quesQuerry;
@@ -279,22 +297,24 @@ public class QuestionPageList extends JCRPageList {
   }
 
   /**
-   * Get questions to view in page. Base on total questions, number of question per page, current page, this function get right questions. For example: have 100 questions, view 10 questions per page,
-   * and current page is 1, this function will get questions form first question to tenth question and put them into a list which is viewed.
+   * Get questions to view in page. Base on total questions, number of question
+   * per page, current page, this function get right questions. For example:
+   * have 100 questions, view 10 questions per page, and current page is 1, this
+   * function will get questions form first question to tenth question and put
+   * them into a list which is viewed.
    * 
    * @param username the name of current user
    * @param page number of current page
-   * 
    * @throws Exception the exception
-   * 
-   * @see org.exoplatform.faq.service.JCRPageList#populateCurrentPage(long, java.lang.String)
+   * @see org.exoplatform.faq.service.JCRPageList#populateCurrentPage(long,
+   *      java.lang.String)
    */
   protected void populateCurrentPage(long page, String username) throws Exception {
     if (iter_ == null || !iter_.hasNext()) {
       Session session = getJCRSession();
       if (isQuery_) {
         QueryManager qm = session.getWorkspace().getQueryManager();
-        Query query = qm.createQuery(value_, Query.XPATH);
+        Query query = qm.createQuery(value_, Query.SQL);
         QueryResult result = query.execute();
         iter_ = result.getNodes();
       } else {
@@ -352,7 +372,7 @@ public class QuestionPageList extends JCRPageList {
       Session session = getJCRSession();
       if (isQuery_) {
         QueryManager qm = session.getWorkspace().getQueryManager();
-        Query query = qm.createQuery(value_, Query.XPATH);
+        Query query = qm.createQuery(value_, Query.SQL);
         QueryResult result = query.execute();
         iter_ = result.getNodes();
       } else {
@@ -393,14 +413,15 @@ public class QuestionPageList extends JCRPageList {
 
   /*
    * (non-Javadoc)
-   * @see org.exoplatform.faq.service.JCRPageList#populateCurrentPageWatch(long, java.lang.String)
+   * @see org.exoplatform.faq.service.JCRPageList#populateCurrentPageWatch(long,
+   * java.lang.String)
    */
   @Override
   protected void populateCurrentPageWatch(long page, String username) throws Exception {
     if (iter_ == null || !iter_.hasNext()) {
       Session session = getJCRSession();
       QueryManager qm = session.getWorkspace().getQueryManager();
-      Query query = qm.createQuery(value_, Query.XPATH);
+      Query query = qm.createQuery(value_, Query.SQL);
       QueryResult result = query.execute();
       iter_ = result.getNodes();
       // closeSession();
@@ -426,7 +447,9 @@ public class QuestionPageList extends JCRPageList {
 
   /*
    * (non-Javadoc)
-   * @see org.exoplatform.faq.service.JCRPageList#populateCurrentPageResultSearch(long, java.lang.String)
+   * @see
+   * org.exoplatform.faq.service.JCRPageList#populateCurrentPageResultSearch
+   * (long, java.lang.String)
    */
   @Override
   protected void populateCurrentPageResultSearch(long page, String username) throws Exception {
@@ -446,7 +469,9 @@ public class QuestionPageList extends JCRPageList {
 
   /*
    * (non-Javadoc)
-   * @see org.exoplatform.faq.service.JCRPageList#populateCurrentPageCategoriesSearch(long, java.lang.String)
+   * @see
+   * org.exoplatform.faq.service.JCRPageList#populateCurrentPageCategoriesSearch
+   * (long, java.lang.String)
    */
   @Override
   protected void populateCurrentPageCategoriesSearch(long page, String username) throws Exception {
@@ -468,7 +493,7 @@ public class QuestionPageList extends JCRPageList {
       if (iter_ == null || !iter_.hasNext()) {
         Session session = getJCRSession();
         QueryManager qm = session.getWorkspace().getQueryManager();
-        Query query = qm.createQuery(value_, Query.XPATH);
+        Query query = qm.createQuery(value_, Query.SQL);
         QueryResult result = query.execute();
         iter_ = result.getNodes();
         // closeSession();
@@ -498,7 +523,9 @@ public class QuestionPageList extends JCRPageList {
 
   /*
    * (non-Javadoc)
-   * @see org.exoplatform.faq.service.JCRPageList#populateCurrentPageQuestionsSearch(long, java.lang.String)
+   * @see
+   * org.exoplatform.faq.service.JCRPageList#populateCurrentPageQuestionsSearch
+   * (long, java.lang.String)
    */
   @Override
   protected void populateCurrentPageQuestionsSearch(long page, String username) throws Exception {
@@ -518,7 +545,8 @@ public class QuestionPageList extends JCRPageList {
 
   /*
    * (non-Javadoc)
-   * @see org.exoplatform.faq.service.JCRPageList#populateCurrentPageCategoriesQuestionsSearch(long, java.lang.String)
+   * @see org.exoplatform.faq.service.JCRPageList#
+   * populateCurrentPageCategoriesQuestionsSearch(long, java.lang.String)
    */
   @SuppressWarnings("unchecked")
   @Override
@@ -529,10 +557,11 @@ public class QuestionPageList extends JCRPageList {
       listObject_ = new ArrayList<Object>();
       int size = 0;
 
-      // ================== get list questions ===================================================
+      // ================== get list questions
+      // ===================================================
       Session session = getJCRSession();
       QueryManager qm = session.getWorkspace().getQueryManager();
-      Query query = qm.createQuery(questionQuery_, Query.XPATH);
+      Query query = qm.createQuery(questionQuery_, Query.SQL);
       QueryResult result = query.execute();
       iter_ = result.getNodes();
       Question question = null;
@@ -546,7 +575,8 @@ public class QuestionPageList extends JCRPageList {
       }
 
       // closeSession(); // was missing ?
-      // ================== get list catetgories ===================================================
+      // ================== get list catetgories
+      // ===================================================
       iter_ = null;
       iter_ = nodeCategory_.getNodes();
       List<Category> listCategory = new ArrayList<Category>();
@@ -599,13 +629,13 @@ public class QuestionPageList extends JCRPageList {
   }
 
   /**
-   * Set values for all question's properties from question node which is got form NodeIterator.
+   * Set values for all question's properties from question node which is got
+   * form NodeIterator.
    * 
    * @param questionNode the question node is got form NodeIterator
-   * 
    * @return Question with all properties are set from question node
-   * 
-   * @throws Exception if repository ,value format or path of node occur exception
+   * @throws Exception if repository ,value format or path of node occur
+   *           exception
    */
   private Question getQuestion(Node questionNode) throws Exception {
     Question question = new Question();
@@ -616,7 +646,8 @@ public class QuestionPageList extends JCRPageList {
     question.setAuthor(reader.string(FAQNodeTypes.EXO_AUTHOR, ""));
     question.setEmail(reader.string(FAQNodeTypes.EXO_EMAIL, ""));
     question.setQuestion(reader.string(FAQNodeTypes.EXO_TITLE, ""));
-    question.setCreatedDate(reader.date(FAQNodeTypes.EXO_CREATED_DATE, CommonUtils.getGreenwichMeanTime().getTime()));
+    question.setCreatedDate(reader.date(FAQNodeTypes.EXO_CREATED_DATE,
+                                        CommonUtils.getGreenwichMeanTime().getTime()));
     question.setActivated(reader.bool(FAQNodeTypes.EXO_IS_ACTIVATED, true));
     question.setApproved(reader.bool(FAQNodeTypes.EXO_IS_APPROVED, true));
     question.setRelations(reader.strings(FAQNodeTypes.EXO_RELATIVES, new String[] {}));
@@ -667,7 +698,8 @@ public class QuestionPageList extends JCRPageList {
     answer.setResponses(reader.string(FAQNodeTypes.EXO_RESPONSES, ""));
     answer.setResponseBy(reader.string(FAQNodeTypes.EXO_RESPONSE_BY, ""));
     answer.setFullName(reader.string(FAQNodeTypes.EXO_FULL_NAME, ""));
-    answer.setDateResponse(reader.date(FAQNodeTypes.EXO_DATE_RESPONSE, CommonUtils.getGreenwichMeanTime().getTime()));
+    answer.setDateResponse(reader.date(FAQNodeTypes.EXO_DATE_RESPONSE,
+                                       CommonUtils.getGreenwichMeanTime().getTime()));
     answer.setUsersVoteAnswer(reader.strings(FAQNodeTypes.EXO_USERS_VOTE_ANSWER, new String[] {}));
     answer.setMarkVotes(reader.l(FAQNodeTypes.EXO_MARK_VOTES));
     answer.setApprovedAnswers(reader.bool(FAQNodeTypes.EXO_APPROVE_RESPONSES, true));
@@ -705,7 +737,8 @@ public class QuestionPageList extends JCRPageList {
     comment.setComments(reader.string(FAQNodeTypes.EXO_COMMENTS, ""));
     comment.setCommentBy(reader.string(FAQNodeTypes.EXO_COMMENT_BY, ""));
     comment.setFullName(reader.string(FAQNodeTypes.EXO_FULL_NAME, ""));
-    comment.setDateComment(reader.date(FAQNodeTypes.EXO_DATE_COMMENT, CommonUtils.getGreenwichMeanTime().getTime()));
+    comment.setDateComment(reader.date(FAQNodeTypes.EXO_DATE_COMMENT,
+                                       CommonUtils.getGreenwichMeanTime().getTime()));
     comment.setPostId(reader.string(FAQNodeTypes.EXO_POST_ID, ""));
     return comment;
   }
@@ -714,9 +747,7 @@ public class QuestionPageList extends JCRPageList {
    * Gets the category.
    * 
    * @param categoryNode the category node
-   * 
    * @return the category
-   * 
    * @throws Exception the exception
    */
   private Category getCategory(Node categoryNode) throws Exception {
@@ -725,7 +756,8 @@ public class QuestionPageList extends JCRPageList {
     cat.setId(categoryNode.getName());
     cat.setName(reader.string(FAQNodeTypes.EXO_NAME, ""));
     cat.setDescription(reader.string(FAQNodeTypes.EXO_DESCRIPTION, ""));
-    cat.setCreatedDate(reader.date(FAQNodeTypes.EXO_CREATED_DATE, CommonUtils.getGreenwichMeanTime().getTime()));
+    cat.setCreatedDate(reader.date(FAQNodeTypes.EXO_CREATED_DATE,
+                                   CommonUtils.getGreenwichMeanTime().getTime()));
     cat.setModerators(reader.strings(FAQNodeTypes.EXO_MODERATORS, new String[] {}));
     cat.setUserPrivate(reader.strings(FAQNodeTypes.EXO_USER_PRIVATE, new String[] {}));
     cat.setModerateQuestions(reader.bool(FAQNodeTypes.EXO_IS_MODERATE_QUESTIONS, false));
@@ -762,14 +794,13 @@ public class QuestionPageList extends JCRPageList {
   }
 
   /**
-   * Get all nodes is stored in a NodeIterator and sort them by FAQSetting, with each node, system get all values of this node and set them into a question object, an this question object is push into
-   * a list questions.
+   * Get all nodes is stored in a NodeIterator and sort them by FAQSetting, with
+   * each node, system get all values of this node and set them into a question
+   * object, an this question object is push into a list questions.
    * 
    * @return list questions
-   * 
    * @throws Exception if query or repository or path of node is occur Exception
    * @throws Exception the exception
-   * 
    * @see Question
    * @see List
    */
@@ -778,7 +809,7 @@ public class QuestionPageList extends JCRPageList {
       Session session = getJCRSession();
       if (isQuery_) {
         QueryManager qm = session.getWorkspace().getQueryManager();
-        Query query = qm.createQuery(value_, Query.XPATH);
+        Query query = qm.createQuery(value_, Query.SQL);
         QueryResult result = query.execute();
         iter_ = result.getNodes();
       } else {
@@ -804,7 +835,7 @@ public class QuestionPageList extends JCRPageList {
       Session session = getJCRSession();
       if (isQuery_) {
         QueryManager qm = session.getWorkspace().getQueryManager();
-        Query query = qm.createQuery(value_, Query.XPATH);
+        Query query = qm.createQuery(value_, Query.SQL);
         QueryResult result = query.execute();
         iter_ = result.getNodes();
       } else {
@@ -832,18 +863,17 @@ public class QuestionPageList extends JCRPageList {
   }
 
   /**
-   * Get a Session from Portal container, and this session is used to set a query
+   * Get a Session from Portal container, and this session is used to set a
+   * query
    * 
-   * @return          an session object
-   * 
-   * @throw Exception if repository config occur exception
-   *                  or if repository occur exception
-   *                  or if login or workspace occur exception
-   *                  
-   * @see             Session
+   * @return an session object
+   * @throw Exception if repository config occur exception or if repository occur
+   *        exception or if login or workspace occur exception
+   * @see Session
    */
   private Session getJCRSession() throws Exception {
-    return (sessionManager.getCurrentSession() != null) ? sessionManager.getCurrentSession() : sessionManager.openSession();
+    return (sessionManager.getCurrentSession() != null) ? sessionManager.getCurrentSession()
+                                                       : sessionManager.openSession();
   }
 
   private void closeSession() throws Exception {

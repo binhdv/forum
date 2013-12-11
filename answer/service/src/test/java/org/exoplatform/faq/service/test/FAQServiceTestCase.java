@@ -35,6 +35,7 @@ import org.exoplatform.faq.service.Category;
 import org.exoplatform.faq.service.CategoryInfo;
 import org.exoplatform.faq.service.Comment;
 import org.exoplatform.faq.service.FAQEventQuery;
+import org.exoplatform.faq.service.FAQSearchEventQuery;
 import org.exoplatform.faq.service.FAQSetting;
 import org.exoplatform.faq.service.FileAttachment;
 import org.exoplatform.faq.service.JCRPageList;
@@ -307,7 +308,7 @@ public class FAQServiceTestCase extends FAQServiceBaseTestCase {
 
   public void testSearch() throws Exception {
 
-    FAQEventQuery eventQuery = new FAQEventQuery();
+    FAQSearchEventQuery eventQuery = new FAQSearchEventQuery();
 
     // search with text = "test"
     eventQuery.setText("test");
@@ -368,7 +369,7 @@ public class FAQServiceTestCase extends FAQServiceBaseTestCase {
   }
   
   public void testSearchWithSpecialCharaters() throws Exception {
-    FAQEventQuery eventQuery = new FAQEventQuery();
+    FAQSearchEventQuery eventQuery = new FAQSearchEventQuery();
 
     eventQuery.setText("test");
     eventQuery.setAdmin(true);
@@ -602,6 +603,22 @@ public class FAQServiceTestCase extends FAQServiceBaseTestCase {
       emails = notifyInfo.getEmailAddresses();
     }
     assertEquals(emails.toString(), "[dttempmail@gmail.com, duytucntt@gmail.com, tu.duy@exoplatform.com]");
+  }
+  
+  public void testCreateAnswerRSS() throws Exception {
+    Answer answer1 = createAnswer(USER_ROOT, "Answer 1");
+    Answer answer2 = createAnswer(USER_ROOT, "Answer 2");
+    Comment comment1 = createComment(USER_ROOT, "Root comment 1 for question");
+    Comment comment2 = createComment(USER_DEMO, "Demo comment 2 for question");
+    
+    String questionId = categoryId1 + "/" + Utils.QUESTION_HOME + "/" + questionId1;
+    
+    faqService_.saveComment(questionId, comment1, true);
+    faqService_.saveComment(questionId, comment2, true);
+    faqService_.saveAnswer(questionId, new Answer[] { answer1, answer2 });
+    
+    InputStream is = faqService_.createAnswerRSS(categoryId1);
+    assertNotNull(is);
   }
 
 }

@@ -23,7 +23,7 @@ import java.util.Locale;
 
 import org.exoplatform.answer.webui.BaseUIFAQForm;
 import org.exoplatform.answer.webui.FAQUtils;
-import org.exoplatform.faq.service.FAQEventQuery;
+import org.exoplatform.faq.service.FAQSearchEventQuery;
 import org.exoplatform.faq.service.FAQSetting;
 import org.exoplatform.faq.service.ObjectSearchResult;
 import org.exoplatform.forum.common.CommonUtils;
@@ -306,7 +306,7 @@ public class UIAdvancedSearchForm extends BaseUIFAQForm implements UIPopupCompon
       /**
        * Create query string from data inputed
        */
-      FAQEventQuery eventQuery = new FAQEventQuery();
+      FAQSearchEventQuery eventQuery = new FAQSearchEventQuery();
       eventQuery.setType(type);
       eventQuery.setText(text);
       eventQuery.setName(categoryName);

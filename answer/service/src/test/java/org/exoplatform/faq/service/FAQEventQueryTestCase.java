@@ -35,7 +35,7 @@ public class FAQEventQueryTestCase extends TestCase {
   }
 
   public void testQuickSearch() throws Exception {
-    FAQEventQuery queryObject = new FAQEventQuery();
+    FAQSearchEventQuery queryObject = new FAQSearchEventQuery();
 
     /*
      * eventQuery.setAdmin(uiQuickSearch.faqSetting_.isAdmin()) ; eventQuery.setUserMembers(UserHelper.getAllGroupAndMembershipOfUser(FAQUtils.getCurrentUser())); eventQuery.setUserId(FAQUtils.getCurrentUser()) ; eventQuery.setText(text); eventQuery.setType("categoryAndQuestion");
@@ -66,7 +66,7 @@ public class FAQEventQueryTestCase extends TestCase {
   }
 
   public void testBuildCategoryQuery() throws Exception {
-    final FAQEventQuery queryObject = new FAQEventQuery();
+    final FAQSearchEventQuery queryObject = new FAQSearchEventQuery();
     queryObject.setPath("/foo");
     queryObject.setType(FAQEventQuery.FAQ_CATEGORY);
     queryObject.setAdmin(true);
@@ -99,7 +99,7 @@ public class FAQEventQueryTestCase extends TestCase {
     String selector = "/jcr:root/foo//* [(";
     String predicate;
     String orderBy = " order by @exo:title ascending";
-    final FAQEventQuery eventQuery = new FAQEventQuery();
+    final FAQSearchEventQuery eventQuery = new FAQSearchEventQuery();
     eventQuery.setType(FAQEventQuery.FAQ_QUESTION);
     eventQuery.setPath("/foo");
     eventQuery.setAuthor("root");

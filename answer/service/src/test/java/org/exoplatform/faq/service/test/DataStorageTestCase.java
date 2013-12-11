@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -39,6 +40,7 @@ import org.exoplatform.faq.service.Comment;
 import org.exoplatform.faq.service.DataStorage;
 import org.exoplatform.faq.service.FAQEventQuery;
 import org.exoplatform.faq.service.FAQNodeTypes;
+import org.exoplatform.faq.service.FAQSearchEventQuery;
 import org.exoplatform.faq.service.FAQSetting;
 import org.exoplatform.faq.service.FileAttachment;
 import org.exoplatform.faq.service.JCRPageList;
@@ -417,7 +419,14 @@ public class DataStorageTestCase extends FAQServiceBaseTestCase {
   }
   
   public void testGetAllQuestionsByCatetory() throws Exception {
-    // TODO:
+    JCRPageList questionPageList = dataStorage.getAllQuestionsByCatetory(categoryId1, faqSetting_);
+    assertNotNull(questionPageList);
+    assertEquals(5, questionPageList.getAll().size());
+    
+    //
+    questionPageList = dataStorage.getAllQuestionsByCatetory(categoryId2, faqSetting_);
+    assertNotNull(questionPageList);
+    assertEquals(0, questionPageList.getAll().size());
   }
   
   public void testGetQuestionsByListCatetory() throws Exception {
@@ -823,7 +832,7 @@ public class DataStorageTestCase extends FAQServiceBaseTestCase {
   
   public void testGetSearchResults() throws Exception {
     //
-    FAQEventQuery eventQuery = new FAQEventQuery();
+    FAQSearchEventQuery eventQuery = new FAQSearchEventQuery();
     eventQuery.setText("test");
     eventQuery.setAdmin(true);
     eventQuery.setUserId(USER_ROOT);
@@ -871,6 +880,7 @@ public class DataStorageTestCase extends FAQServiceBaseTestCase {
     assertEquals(0, dataStorage.getSearchResults(eventQuery).size());
     eventQuery.setAuthor("Mary Kelly");
     eventQuery.setText("");
+    eventQuery.setToDate(Calendar.getInstance());
     assertEquals(1, dataStorage.getSearchResults(eventQuery).size());
   }
   
@@ -1111,7 +1121,9 @@ public class DataStorageTestCase extends FAQServiceBaseTestCase {
   }
   
   public void testCalculateDeletedUser() throws Exception {
-    // TODO:
+    dataStorage.calculateDeletedUser(USER_ROOT);
+    Question question1 = dataStorage.getQuestionById(questionId1);
+    assertTrue(question1.getAuthor().contains(USER_ROOT + ":deleted"));
   }
   
   private FileAttachment createUserAvatar(String fileName) throws Exception {

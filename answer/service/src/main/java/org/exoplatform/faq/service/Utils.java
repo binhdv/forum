@@ -195,6 +195,25 @@ public class Utils {
     return queryString.toString();
   }
   
+  public static String getSQLOderBy(FAQSetting faqSetting) {
+    StringBuilder queryString = new StringBuilder();
+    if (faqSetting.isSortQuestionByVote()) {
+      queryString.append(FAQNodeTypes.EXO_MARK_VOTE).append(" DESC, ");
+    }
+    // order by and ascending or descending
+    if (faqSetting.getOrderBy().equals(FAQSetting.DISPLAY_TYPE_POSTDATE)) {
+      queryString.append(FAQNodeTypes.EXO_CREATED_DATE);
+    } else {
+      queryString.append(FAQNodeTypes.EXO_TITLE);
+    }
+    if (faqSetting.getOrderType().equals(FAQSetting.ORDERBY_TYPE_ASC)) {
+      queryString.append(" ASC");
+    } else {
+      queryString.append(" DESC");
+    }
+    return queryString.toString();
+  }
+  
   public static String buildQueryListOfUser(String property, List<String> listOfUser) {
     StringBuilder query = new StringBuilder();
     for (String expr : listOfUser) {
@@ -210,5 +229,32 @@ public class Utils {
       }
     }
     return query.toString();
+  }
+  
+  public static String buildSQLQueryListOfUser(String property, List<String> listOfUser) {
+    StringBuilder query = new StringBuilder();
+    for (String expr : listOfUser) {
+      if(query.length() > 0) {
+        query.append(" OR ");
+      }
+      query.append(property).append(" = '").append(expr).append("'");
+      if (FAQServiceUtils.isGroupExpression(expr)) {
+        query.append(" OR ").append(property).append(" = '*:").append(expr).append("'");
+      } else if(FAQServiceUtils.isMembershipExpression(expr)){
+        expr = expr.substring(expr.indexOf(":")+1);
+        query.append(" OR ").append(property).append(" = '*:").append(expr).append("'");
+      }
+    }
+    return query.toString();
+  }
+  
+  public static StringBuilder createSQLQueryByPath(String object, String path, boolean haveNotLike) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("SELECT * FROM ").append(object).append(" WHERE ");
+    sb.append("jcr:path LIKE '").append(path).append("/%'");
+    if (haveNotLike) {
+      sb.append(" AND NOT jcr:path LIKE '").append(path).append("/%/%'");
+    }
+    return sb;
   }
 }

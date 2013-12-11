@@ -132,6 +132,9 @@ public class AnswerSearchConnectorTestCase extends FAQServiceBaseTestCase {
     assertEquals(4, answerSearchConnector.search(context, " ques~", Collections.EMPTY_LIST, 0, 10, "relevancy", "ASC").size());
     assertEquals(1, answerSearchConnector.search(context, " clo~", Collections.EMPTY_LIST, 0, 10, "relevancy", "ASC").size());
     assertEquals(1, answerSearchConnector.search(context, " clo*~", Collections.EMPTY_LIST, 0, 10, "relevancy", "ASC").size());
+    
+    assertEquals(2, answerSearchConnector.search(context, " *reponses~0.5", Collections.EMPTY_LIST, 0, 10, "relevancy", "ASC").size());
+    assertEquals(2, answerSearchConnector.search(context, " reponses~0.5", Collections.EMPTY_LIST, 0, 10, "relevancy", "ASC").size());
 
   }
 

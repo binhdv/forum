@@ -296,9 +296,12 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
   }
 
   private NodeIterator getQuestionsIterator(Node parentNode, String strQuery, boolean isAll) throws Exception {
-    StringBuffer queryString = new StringBuffer(JCR_ROOT).append(parentNode.getPath()).append((isAll) ? "//" : "/").append("element(*,exo:faqQuestion)").append(strQuery);
+    StringBuilder sb = Utils.createSQLQueryByPath(EXO_FAQ_QUESTION, parentNode.getPath(), !isAll);
+    if (! EMPTY_STR.equals(strQuery)) {
+      sb.append(" AND ").append(strQuery);
+    }
     QueryManager qm = parentNode.getSession().getWorkspace().getQueryManager();
-    Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+    Query query = qm.createQuery(sb.toString(), Query.SQL);
     QueryResult result = query.execute();
     return result.getNodes();
   }
@@ -593,14 +596,14 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
       if (questionNode.hasNode(Utils.ANSWER_HOME)) {
         Node answerHome = questionNode.getNode(Utils.ANSWER_HOME);
         QueryManager qm = answerHome.getSession().getWorkspace().getQueryManager();
-        StringBuffer queryString = new StringBuffer(JCR_ROOT).append(answerHome.getPath()).append("//element(*,exo:answer)");
+        StringBuilder queryString = Utils.createSQLQueryByPath(EXO_ANSWER, answerHome.getPath(), true);
         if ((Boolean) isSortByVote == null)
-          queryString.append("order by @exo:dateResponse ascending");
+          queryString.append(" ORDER BY ").append(EXO_DATE_RESPONSE).append(" ASC");
         else if (isSortByVote)
-          queryString.append("order by @exo:MarkVotes ascending");
+          queryString.append(" ORDER BY ").append(EXO_MARK_VOTES).append(" ASC");
         else
-          queryString.append("order by @exo:MarkVotes descending");
-        Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+          queryString.append(" ORDER BY ").append(EXO_MARK_VOTES).append(" DESC");
+        Query query = qm.createQuery(queryString.toString(), Query.SQL);
         QueryResult result = query.execute();
         QuestionPageList pageList = new QuestionPageList(result.getNodes(), 10, queryString.toString(), true);
         return pageList;
@@ -816,8 +819,9 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     try {
       Node commentHome = getFAQServiceHome(sProvider).getNode(questionId + "/" + Utils.COMMENT_HOME);
       QueryManager qm = commentHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(commentHome.getPath()).append("//element(*,exo:comment)").append("order by @exo:dateComment ascending");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_COMMENT, commentHome.getPath(), true);
+      queryString.append(" ORDER BY ").append(EXO_DATE_COMMENT).append(" ASC");
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       QuestionPageList pageList = new QuestionPageList(result.getNodes(), 10, queryString.toString(), true);
       return pageList;
@@ -1078,9 +1082,10 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
   private List<String> getViewableCategoryIds(SessionProvider sessionProvider) throws Exception {
     List<String> listId = new ArrayList<String>();
     Node cateHomeNode = getCategoryHome(sessionProvider, null);
-    StringBuffer queryString = new StringBuffer(JCR_ROOT).append(cateHomeNode.getPath()).append("//element(*,exo:faqCategory)[@exo:isView='true'] order by @exo:createdDate descending");
+    StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_CATEGORY, cateHomeNode.getPath(), false);
+    queryString.append(" AND ").append(EXO_IS_VIEW).append(" = 'true' ORDER BY ").append(EXO_CREATED_DATE).append(" DESC");
     QueryManager qm = cateHomeNode.getSession().getWorkspace().getQueryManager();
-    Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+    Query query = qm.createQuery(queryString.toString(), Query.SQL);
     QueryResult result = query.execute();
     NodeIterator iter = result.getNodes();
     while (iter.hasNext()) {
@@ -1095,9 +1100,11 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     SessionProvider sessionProvider = CommonUtils.createSystemProvider();
     try {
       Node faqHome = getFAQServiceHome(sessionProvider);
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(faqHome.getPath()).append("//element(*,exo:faqCategory)[@exo:userPrivate != ''] order by @exo:createdDate descending");
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_CATEGORY, faqHome.getPath(), false);
+      queryString.append(" AND ").append(EXO_USER_PRIVATE).append(" <> '' ")
+                 .append("ORDER BY ").append(EXO_CREATED_DATE).append(" DESC");
       QueryManager qm = faqHome.getSession().getWorkspace().getQueryManager();
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       NodeIterator iter = result.getNodes();
       boolean isAudience = false;
@@ -1139,15 +1146,21 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     try {
       Node categoryHome = getCategoryHome(sProvider, null);
       QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getPath()).append("//element(*,exo:faqQuestion)[");
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_QUESTION, categoryHome.getPath(), false);
       List<String> listIds = getViewableCategoryIds(sProvider);
+      if (listIds.size() > 0) {
+        queryString.append(" AND (");
+      }
       for (int i = 0; i < listIds.size(); i++) {
         if (i > 0)
-          queryString.append(" or ");
-        queryString.append("(exo:categoryId='").append(listIds.get(i)).append("')");
+          queryString.append(" OR ");
+        queryString.append(EXO_CATEGORY_ID).append(" = '").append(listIds.get(i)).append("'");
       }
-      queryString.append("]order by @exo:createdDate ascending");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      if (listIds.size() > 0) {
+        queryString.append(")");
+      }
+      queryString.append(" ORDER BY ").append(EXO_CREATED_DATE).append(" ASC");
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       QuestionPageList pageList = new QuestionPageList(result.getNodes(), 10, queryString.toString(), true);
       return pageList;
@@ -1175,24 +1188,28 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
           isOpenQs = Boolean.parseBoolean(strs[1]);
         }
       }
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getPath()).append("//element(*,exo:faqQuestion)[");
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_QUESTION, categoryHome.getPath(), false);
+      queryString.append(" AND (");
+      //StringBuilder queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getPath()).append("//element(*,exo:faqQuestion)[");
       if (categoryId.equals(Utils.ALL)) {
         List<String> listIds = getViewableCategoryIds(sProvider);
         for (int i = 0; i < listIds.size(); i++) {
           if (i > 0)
-            queryString.append(" or ");
-          queryString.append("(exo:categoryId='").append(listIds.get(i)).append("')");
+            queryString.append(" OR ");
+          queryString.append(EXO_CATEGORY_ID).append(" = '").append(listIds.get(i)).append("'");
         }
       } else {
-        queryString.append("((@exo:categoryId='").append(categoryId).append("')").append((categoryId.indexOf("/") > 0) ? (" or (@exo:categoryId='" + categoryId.substring(categoryId.lastIndexOf("/") + 1) + "'))") : ")");
+        queryString.append(EXO_CATEGORY_ID).append(" = '").append(categoryId).append("'").append((categoryId.indexOf("/") > 0) ? (" OR " + EXO_CATEGORY_ID + " = '" + categoryId.substring(categoryId.lastIndexOf("/") + 1) + "'") : "");
       }
-      if (isApproved)
-        queryString.append(" and (@exo:isApproved='true')");
-      if (qr.length() > 0)
-        queryString.append(" and ((@exo:isApproved='true') or ").append(qr).append(")");
-      queryString.append("] order by @exo:createdDate ascending");
+      queryString.append(")");
+      if (qr.length() > 0) {
+        queryString.append(" AND (").append(EXO_IS_APPROVED).append(" = 'true'").append(" OR ").append(qr).append(")");
+      } else if (isApproved){
+        queryString.append(" AND (").append(EXO_IS_APPROVED).append(" = 'true')");
+      }
+      queryString.append(" ORDER BY ").append(EXO_CREATED_DATE).append(" ASC");
 
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       QuestionPageList pageList = new QuestionPageList(result.getNodes(), 10, queryString.toString(), true);
       pageList.setNotYetAnswered(true);
@@ -1210,28 +1227,15 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     try {
       Node categoryHome = getCategoryHome(sProvider, null);
       QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = null;
       if (categoryId == null || categoryId.trim().length() < 1)
         categoryId = "null";
-      queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getPath())
-                                              .append("//element(*,")
-                                              .append(EXO_FAQ_QUESTION)
-                                              .append(")[((")
-                                              .append(AT)
-                                              .append(EXO_CATEGORY_ID)
-                                              .append("='")
-                                              .append(categoryId)
-                                              .append("')")
-                                              .append((categoryId.indexOf("/") > 0) ? (" or (" + AT + EXO_CATEGORY_ID + "='" + categoryId.substring(categoryId.lastIndexOf("/") + 1) + "'))") : ")")
-                                              .append(" and (")
-                                              .append(AT)
-                                              .append(EXO_IS_ACTIVATED)
-                                              .append("='true') and (")
-                                              .append(AT)
-                                              .append(EXO_IS_APPROVED)
-                                              .append("='false')]");
-      queryString.append("order by ").append(Utils.getOderBy(faqSetting));
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_QUESTION, categoryHome.getPath(), false);
+      queryString.append(" AND (").append(EXO_CATEGORY_ID).append(" = '").append(categoryId).append("'")
+                 .append((categoryId.indexOf("/") > 0) ? (" OR " + EXO_CATEGORY_ID + " = '" + categoryId.substring(categoryId.lastIndexOf("/") + 1) + "')") : ")")
+                 .append(" AND ").append(EXO_IS_ACTIVATED).append(" = 'true' AND ")
+                 .append(EXO_IS_APPROVED).append(" = 'false'");
+      queryString.append(" ORDER BY ").append(Utils.getSQLOderBy(faqSetting));
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       QuestionPageList pageList = new QuestionPageList(result.getNodes(), 10, queryString.toString(), true);
       return pageList;
@@ -1252,23 +1256,22 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
       categoryId = categoryNode.getName();
       QueryManager qm = categoryNode.getSession().getWorkspace().getQueryManager();
       String userId = faqSetting.getCurrentUser();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(categoryNode.getPath()).append("/").append(Utils.QUESTION_HOME).append("/element(*,")
-                                 .append(EXO_FAQ_QUESTION).append(")[(@").append(EXO_CATEGORY_ID).append("='").append(categoryId)
-                                 .append("') and (@").append(EXO_IS_ACTIVATED).append("='true')");
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_QUESTION, categoryNode.getPath() + "/" + Utils.QUESTION_HOME, true);
+      queryString.append(" AND ").append(EXO_IS_ACTIVATED).append(" = 'true'");
       if (!faqSetting.isCanEdit()) {
-        queryString.append(" and (@").append(EXO_IS_APPROVED).append("='true'");
+        queryString.append(" AND (").append(EXO_IS_APPROVED).append(" = 'true'");
         if (userId != null && userId.length() > 0 && FAQSetting.DISPLAY_BOTH.equals(faqSetting.getDisplayMode())) {
-          queryString.append(" or @").append(EXO_AUTHOR).append("='").append(userId).append("')");
+          queryString.append(" OR ").append(EXO_AUTHOR).append(" = '").append(userId).append("')");
         } else {
           queryString.append(")");
         }
       } else {
         if (FAQSetting.DISPLAY_APPROVED.equals(faqSetting.getDisplayMode())) {
-          queryString.append(" and (@").append(EXO_IS_APPROVED).append("='true')");
+          queryString.append(" AND ").append(EXO_IS_APPROVED).append("='true'");
         }
       }
-      queryString.append("] order by ").append(Utils.getOderBy(faqSetting));
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      queryString.append(" ORDER BY ").append(Utils.getSQLOderBy(faqSetting));
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       QuestionPageList pageList = new QuestionPageList(result.getNodes(), 10, queryString.toString(), true);
       return pageList;
@@ -1282,16 +1285,15 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
   public QuestionPageList getAllQuestionsByCatetory(String categoryId, FAQSetting faqSetting) throws Exception {
     SessionProvider sProvider = CommonUtils.createSystemProvider();
     try {
-      Node categoryHome = getCategoryHome(sProvider, null);
-      QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = null;
+      Node categoryNode = getCategoryNode(sProvider, categoryId);
+      categoryId = categoryNode.getName();
+      QueryManager qm = categoryNode.getSession().getWorkspace().getQueryManager();
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_QUESTION, categoryNode.getPath() + "/" + Utils.QUESTION_HOME, true);
       if (FAQSetting.DISPLAY_APPROVED.equals(faqSetting.getDisplayMode())) {
-        queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getPath()).append("//element(*,exo:faqQuestion)[(@exo:categoryId='").append(categoryId).append("')").append(" and (@exo:isApproved='true')").append("]");
-      } else {
-        queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getPath()).append("//element(*,exo:faqQuestion)[@exo:categoryId='").append(categoryId).append("'").append("]");
+        queryString.append(" AND ").append(EXO_IS_APPROVED).append(" = 'true'");
       }
-      queryString.append("order by ").append(Utils.getOderBy(faqSetting));
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      queryString.append(" ORDER BY ").append(Utils.getSQLOderBy(faqSetting));
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       QuestionPageList pageList = new QuestionPageList(result.getNodes(), 10, queryString.toString(), true);
       return pageList;
@@ -1308,9 +1310,8 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     try {
       Node categoryNode = getCategoryNode(sProvider, categoryId);
       QueryManager qm = categoryNode.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT);
-      queryString.append(categoryNode.getPath()).append("//element(*,exo:faqQuestion)");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_QUESTION, categoryNode.getPath(), false);
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       NodeIterator result = query.execute().getNodes();
       
       while (result.hasNext()) {
@@ -1333,21 +1334,11 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
       Node categoryHome = getCategoryHome(sProvider, null);
 
       QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getPath()).append("//element(*,exo:faqQuestion) [");
-      queryString.append(" (");
-      int i = 0;
-      for (String categoryId : listCategoryId) {
-        if (i > 0)
-          queryString.append(" or ");
-        queryString.append("(@exo:categoryId='").append(categoryId).append("')");
-        i++;
-      }
-      queryString.append(")]");
-      queryString.append(" order by @exo:createdDate ascending");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      String queryString = getQuestionByListCategories(listCategoryId, categoryHome);
+      Query query = qm.createQuery(queryString, Query.SQL);
       QueryResult result = query.execute();
       QuestionPageList pageList = null;
-      pageList = new QuestionPageList(result.getNodes(), 10, queryString.toString(), true);
+      pageList = new QuestionPageList(result.getNodes(), 10, queryString, true);
       pageList.setNotYetAnswered(isNotYetAnswer);
       return pageList;
     } catch (Exception e) {
@@ -1363,16 +1354,8 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     try {
       Node categoryHome = getCategoryHome(sProvider, null);
       QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getPath()).append("//element(*,exo:faqQuestion)[(");
-      int i = 0;
-      for (String categoryId : listCategoryId) {
-        if (i > 0)
-          queryString.append(" or ");
-        queryString.append("(@exo:categoryId='").append(categoryId).append("')");
-        i++;
-      }
-      queryString.append(")]order by @exo:createdDate ascending");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      String queryString = getQuestionByListCategories(listCategoryId, categoryHome);
+      Query query = qm.createQuery(queryString, Query.SQL);
       QueryResult result = query.execute();
       NodeIterator iter = result.getNodes();
       while (iter.hasNext()) {
@@ -1382,6 +1365,21 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
       log.debug("Getting quick questions through list of category failed: ", e);
     }
     return questions;
+  }
+  
+  private String getQuestionByListCategories(List<String> listCategoryId, Node categoryHome) throws Exception {
+    StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_QUESTION, categoryHome.getPath(), false);
+    queryString.append(" AND (");
+    int i = 0;
+    for (String categoryId : listCategoryId) {
+      if (i > 0)
+        queryString.append(" OR ");
+      queryString.append(EXO_CATEGORY_ID).append(" = '").append(categoryId).append("'");
+      i++;
+    }
+    queryString.append(")");
+    queryString.append(" ORDER BY ").append(EXO_CREATED_DATE).append(" ASC");
+    return queryString.toString();
   }
 
   private Question getQuickQuestion(Node questionNode) throws Exception {
@@ -1505,8 +1503,13 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
   private void updateDatas(Node question, String catId, boolean isAnswer) throws Exception {
     try {
       QueryManager qm = question.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(question.getPath()).append("//element(*,").append((isAnswer) ? EXO_ANSWER : EXO_COMMENT).append(")");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      StringBuilder queryString = null;
+      if (isAnswer) {
+        queryString = Utils.createSQLQueryByPath(EXO_ANSWER, question.getPath() + "/" + Utils.ANSWER_HOME, true);
+      } else {
+        queryString = Utils.createSQLQueryByPath(EXO_COMMENT, question.getPath() + "/" + Utils.COMMENT_HOME, true);
+      }
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       NodeIterator iter = result.getNodes();
       while (iter.hasNext()) {
@@ -1842,8 +1845,9 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     try {
       Node categoryHome = getCategoryHome(sProvider, null);
       QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getPath()).append("//element(*,exo:faqCategory)[@exo:name='").append(categoryName).append("']");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_CATEGORY, categoryHome.getPath(), false);
+      queryString.append(" AND ").append(EXO_NAME).append(" = '").append(categoryName).append("'");
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult queryResult = query.execute();
       NodeIterator iter = queryResult.getNodes();
       List<Category> result = new ArrayList<Category>();
@@ -1865,25 +1869,25 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
       StringBuilder builder = new StringBuilder();      
       int i = 0;
       if(allOfUser != null && allOfUser.size() > 0){
-        builder.append(" ( ");
+        builder.append(" (");
         for (String strUser : allOfUser) {
           strUser = strUser.trim();
           if (strUser.length() > 0) {
             if (i > 0) {
-              builder.append(" or ");
+              builder.append(" OR ");
             }
-            builder.append("@").append(EXO_MODERATORS).append("='").append(strUser).append("'");
+            builder.append(EXO_MODERATORS).append("='").append(strUser).append("'");
             i++;
           }
         }
-        builder.append(" ) and ");
+        builder.append(") AND ");
       }
-      builder.append("(@").append(EXO_IS_VIEW).append("='true')");
+      builder.append("(").append(EXO_IS_VIEW).append(" = 'true')");
       Node categoryHome = getCategoryHome(sProvider, null);
       QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getParent().getPath())
-                                                           .append("//element(*,").append(EXO_FAQ_CATEGORY).append(")[").append(builder).append("]");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_CATEGORY, categoryHome.getParent().getPath(), false);
+      queryString.append(" AND ").append(builder.toString());
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       NodeIterator iter = result.getNodes();
       List<String> listCateId = new ArrayList<String>();
@@ -1904,13 +1908,8 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
 
   @Override
   public List<Category> getAllCategories() throws Exception {
-    SessionProvider sProvider = CommonUtils.createSystemProvider();
     try {
-      Node categoryHome = getCategoryHome(sProvider, null);
-      QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getPath()).append("//element(*,exo:faqCategory)");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
-      QueryResult result = query.execute();
+      QueryResult result = getAllCategoriesResult();
       NodeIterator iter = result.getNodes();
       List<Category> catList = new ArrayList<Category>();
       while (iter.hasNext()) {
@@ -1951,18 +1950,26 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
   }
   
   public long existingCategories() throws Exception {
-    SessionProvider sProvider = CommonUtils.createSystemProvider();
     try {
-      Node categoryHome = getCategoryHome(sProvider, null);
-      QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getPath()).append("//element(*,exo:faqCategory)");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
-      QueryResult result = query.execute();
-      result.getNodes().getSize();
+      return getAllCategoriesResult().getNodes().getSize();
     } catch (Exception e) {
       log.error("Failed to check existing categories", e);
     }
     return 0;
+  }
+  
+  private QueryResult getAllCategoriesResult() throws Exception {
+    SessionProvider sProvider = CommonUtils.createSystemProvider();
+    try {
+      Node categoryHome = getCategoryHome(sProvider, null);
+      QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_CATEGORY, categoryHome.getPath(), false);
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
+      return query.execute();
+    } catch (Exception e) {
+      log.error("Getting all category failed: ", e);
+    }
+    return null;
   }
 
   public Node getCategoryNodeById(String categoryId) throws Exception {
@@ -1994,8 +2001,9 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
       param = (param.indexOf("/") > 0) ? param.substring(param.lastIndexOf("/") + 1) : param;
       Node categoryHome = getCategoryHome(sProvider, null);
       QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getPath()).append("//element(*,").append(EXO_FAQ_CATEGORY).append(")").append("[fn:name()='").append(param).append("']");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_CATEGORY, categoryHome.getPath(), false);
+      queryString.append(" AND fn:name() = '").append(param).append("'");
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       NodeIterator iter = result.getNodes();
       if (iter.getSize() != 0)
@@ -2024,22 +2032,21 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
           return catList;
       }
 
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(parentCategory.getPath());
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_CATEGORY, parentCategory.getPath(), true);
+      queryString.append(" AND (");
       if (faqSetting.isAdmin()) {
-        queryString.append("/element(*,").append(EXO_FAQ_CATEGORY)
-                   .append(") [@").append(EXO_IS_VIEW).append("='true'] order by @").append(EXO_INDEX).append(" ascending");
+        queryString.append(EXO_IS_VIEW).append(" = 'true') ORDER BY ").append(EXO_INDEX).append(" ASC");
       } else {
-        queryString.append("/element(*,").append(EXO_FAQ_CATEGORY)
-                   .append(") [@").append(EXO_IS_VIEW).append("='true' and ( not(@").append(EXO_USER_PRIVATE)
-                   .append(") or @").append(EXO_USER_PRIVATE).append("=''");
+        queryString.append(EXO_IS_VIEW).append(" = 'true' AND (").append(EXO_USER_PRIVATE).append(" IS NULL")
+                   .append(" OR ").append(EXO_USER_PRIVATE).append(" = ''");
         if (limitedUsers.size() > 0) {
-          queryString.append(" or ").append(Utils.buildQueryListOfUser(EXO_USER_PRIVATE, limitedUsers));
-          queryString.append(" or ").append(Utils.buildQueryListOfUser(EXO_MODERATORS, limitedUsers));
+          queryString.append(" OR ").append(Utils.buildSQLQueryListOfUser(EXO_USER_PRIVATE, limitedUsers));
+          queryString.append(" OR ").append(Utils.buildSQLQueryListOfUser(EXO_MODERATORS, limitedUsers));
         }
-        queryString.append(")] order by @").append(EXO_INDEX).append(" ascending");
+        queryString.append(")) ORDER BY ").append(EXO_INDEX).append(" ASC");
       }
       QueryManager qm = parentCategory.getSession().getWorkspace().getQueryManager();
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       NodeIterator iter = result.getNodes();
       while (iter.hasNext()) {
@@ -2066,8 +2073,11 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
       NodeIterator iter = parentCategory.getNodes();
       cateInfo[0] = iter.getSize();
       QueryManager qm = parentCategory.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(parentCategory.getPath()).append("//element(*,exo:faqQuestion)[(@exo:categoryId='").append(id).append("') and (@exo:isActivated='true')").append("]").append("order by @exo:createdDate ascending");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_QUESTION, parentCategory.getPath(), false);
+      queryString.append(" AND ").append(EXO_CATEGORY_ID).append(" = '").append(id)
+                 .append("' AND ").append(EXO_IS_ACTIVATED).append(" = 'true'")
+                 .append(" ORDER BY ").append(EXO_CREATED_DATE).append(" ASC");;
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       NodeIterator nodeIterator = result.getNodes();
       cateInfo[1] = nodeIterator.getSize();// all
@@ -2096,8 +2106,10 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
   }
 
   private boolean hasAnswerInQuestion(QueryManager qm, Node questionNode) throws Exception {
-    StringBuffer queryString = new StringBuffer(JCR_ROOT).append(questionNode.getPath()).append("//element(*,exo:answer)[(@exo:approveResponses='true') and (@exo:activateResponses='true')] order by @exo:dateResponse ascending");
-    QueryImpl impl = (QueryImpl) qm.createQuery(queryString.toString(), Query.XPATH);
+    StringBuilder queryString = Utils.createSQLQueryByPath(EXO_ANSWER, questionNode.getPath() + "/" + Utils.ANSWER_HOME, true);
+    queryString.append(" AND ").append(EXO_APPROVE_RESPONSES).append(" = 'true' AND ")
+               .append(EXO_ACTIVATE_RESPONSES).append(" = 'true' ORDER BY ").append(EXO_DATE_RESPONSE).append(" ASC");
+    QueryImpl impl = (QueryImpl) qm.createQuery(queryString.toString(), Query.SQL);
     impl.setOffset(0);
     impl.setLimit(1);
     QueryResult result = impl.execute();
@@ -2168,8 +2180,9 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     try {
       Node categoryHome = getCategoryHome(sProvider, null);
       QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getPath()).append("//element(*,exo:faqCategory)[@exo:id='").append(categoryId).append("']");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_CATEGORY, categoryHome.getPath(), false);
+      queryString.append(" AND ").append(EXO_ID).append(" = '").append(categoryId).append("'");
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       QuestionPageList pageList = new QuestionPageList(result.getNodes(), 5, queryString.toString(), true);
       return pageList;
@@ -2279,9 +2292,9 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     try {
       Node categoryHome = getCategoryHome(sProvider, null);
       QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = null;
-      queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getPath()).append("//element(*,exo:faqCategory)[(@exo:userWatching='").append(userId).append("')]");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_CATEGORY, categoryHome.getPath(), false);
+      queryString.append(" AND ").append(EXO_USER_WATCHING).append(" = '").append(userId).append("'");
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       QuestionPageList pageList = new QuestionPageList(result.getNodes(), 10, queryString.toString(), true);
       return pageList;
@@ -2316,8 +2329,9 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
       Node faqHome = getFAQServiceHome(sProvider);
       Node category = faqHome.getNode(cateId);
       QueryManager qm = faqHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(category.getPath()).append("/element(*,exo:faqCategory)[(@exo:userWatching='").append(userId).append("')]");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_CATEGORY, category.getPath(), true);
+      queryString.append(" AND ").append(EXO_USER_WATCHING).append(" = '").append(userId).append("'");
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       NodeIterator iter = result.getNodes();
       while (iter.hasNext()) {
@@ -2335,14 +2349,17 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     try {
       Node categoryHome = getCategoryHome(sProvider, null);
       QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(categoryHome.getPath()).append("//element(*,exo:faqQuestion)[(@exo:userWatching='").append(currentUser).append("')");
+      
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_QUESTION, categoryHome.getPath(), false);
+      queryString.append(" AND ").append(EXO_USER_WATCHING).append(" = '").append(currentUser).append("'");
+      
       if (FAQSetting.DISPLAY_APPROVED.equals(faqSetting.getDisplayMode())) {
-        queryString.append(" and (@exo:isApproved='true')");
+        queryString.append(" AND ").append(EXO_IS_APPROVED).append(" = 'true'");
       }
       if (!faqSetting.isAdmin())
-        queryString.append(" and (@exo:isActivated='true')");
-      queryString.append("] order by ").append(Utils.getOderBy(faqSetting));
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+        queryString.append(" AND ").append(EXO_IS_ACTIVATED).append(" = 'true'");
+      queryString.append(" ORDER BY ").append(Utils.getSQLOderBy(faqSetting));
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       QuestionPageList pageList = new QuestionPageList(result.getNodes(), 10, queryString.toString(), true);
       return pageList;
@@ -2426,7 +2443,7 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     eventQuery.setPath(categoryHome.getPath());
     try {
       QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
-      Query query = qm.createQuery(eventQuery.getQuery(), Query.XPATH);
+      Query query = qm.createQuery(eventQuery.getQuery(), Query.SQL);
       QueryResult result = query.execute();
       NodeIterator iter = result.getNodes();
       Node nodeObj = null;
@@ -2772,7 +2789,7 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     try {
       
       QueryManager qm = categoryHome.getSession().getWorkspace().getQueryManager();
-      Query query = qm.createQuery(eventQuery.getQuery(), Query.XPATH);
+      Query query = qm.createQuery(eventQuery.getQuery(), Query.SQL);
       QueryResult result = query.execute();
       
       //
@@ -3083,9 +3100,9 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
 
   private NodeIterator getCategoriesIterator(Node parentCategory) throws Exception {
     QueryManager qm = parentCategory.getSession().getWorkspace().getQueryManager();
-    StringBuffer queryString = new StringBuffer(JCR_ROOT).append(parentCategory.getPath());
-    queryString.append("/element(*,").append(EXO_FAQ_CATEGORY).append(") order by @").append(EXO_INDEX).append(" ascending");
-    Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+    StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_CATEGORY, parentCategory.getPath(), true);
+    queryString.append(" ORDER BY ").append(EXO_INDEX).append(" ASC");
+    Query query = qm.createQuery(queryString.toString(), Query.SQL);
     QueryResult result = query.execute();
     return result.getNodes();
   }
@@ -3398,9 +3415,10 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
       return serviceHome.getNode(param);
     } catch (PathNotFoundException e) {
       param = (param.indexOf("/") > 0) ? param.substring(param.lastIndexOf("/") + 1) : param;
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(serviceHome.getPath()).append("//element(*,exo:faqQuestion)[fn:name()='").append(param).append("']");
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_QUESTION, serviceHome.getPath(), false);
+      queryString.append(" AND fn:name()='").append(param).append("'");
       QueryManager qm = serviceHome.getSession().getWorkspace().getQueryManager();
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       NodeIterator iter = result.getNodes();
       if (iter.getSize() > 0)
@@ -3616,9 +3634,10 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
 
   private void reUpdateNumberOfPublicAnswers(Node questionNode) throws RepositoryException {
     QueryManager qm = questionNode.getSession().getWorkspace().getQueryManager();
-    StringBuilder sb = new StringBuilder();
-    sb.append(JCR_ROOT).append(questionNode.getPath()).append("//element(*, exo:answer)[@exo:activateResponses='true' and @exo:approveResponses='true']");
-    Query query = qm.createQuery(sb.toString(), Query.XPATH);
+    StringBuilder sb = Utils.createSQLQueryByPath(EXO_ANSWER, questionNode.getPath(), false);
+    sb.append(" AND ").append(EXO_ACTIVATE_RESPONSES).append(" = 'true' AND ")
+      .append(EXO_APPROVE_RESPONSES).append(" = 'true'");
+    Query query = qm.createQuery(sb.toString(), Query.SQL);
     QueryResult result = query.execute();
     long size = result.getNodes().getSize();
     size = size < 0 ? 0 : size;
@@ -3630,9 +3649,11 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
   private void reUpdateLastActivityOfQuestion(Node quesNode) throws RepositoryException {
     QueryManager qm = quesNode.getSession().getWorkspace().getQueryManager();
 
-    StringBuilder sb = new StringBuilder();
-    sb.append(JCR_ROOT).append(quesNode.getPath()).append("//element(*, exo:answer)[@exo:activateResponses='true' and @exo:approveResponses='true'] order by @exo:dateResponse descending");
-    QueryImpl query = (QueryImpl) qm.createQuery(sb.toString(), Query.XPATH);
+    StringBuilder sb = Utils.createSQLQueryByPath(EXO_ANSWER, quesNode.getPath(), false);
+    sb.append(" AND ").append(EXO_ACTIVATE_RESPONSES).append(" = 'true' AND ")
+      .append(EXO_APPROVE_RESPONSES).append(" = 'true'")
+      .append(" ORDER BY ").append(EXO_DATE_RESPONSE).append(" DESC");
+    QueryImpl query = (QueryImpl) qm.createQuery(sb.toString(), Query.SQL);
     query.setLimit(1);
     QueryResult result = query.execute();
     NodeIterator iter = result.getNodes();
@@ -3651,9 +3672,9 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
 
     }
 
-    sb = new StringBuilder();
-    sb.append(JCR_ROOT).append(quesNode.getPath()).append("//element(*, exo:comment) order by @exo:dateComment descending");
-    query = (QueryImpl) qm.createQuery(sb.toString(), Query.XPATH);
+    sb = Utils.createSQLQueryByPath(EXO_COMMENT, quesNode.getPath(), false);
+    sb.append(" ORDER BY ").append(EXO_DATE_COMMENT).append(" DESC");
+    query = (QueryImpl) qm.createQuery(sb.toString(), Query.SQL);
     query.setLimit(1);
     result = query.execute();
     iter = result.getNodes();
@@ -3703,9 +3724,11 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
   }
 
   private NodeIterator getNodeIteratorAnswerAccess(Node answerHome) throws Exception {
-    StringBuffer queryString = new StringBuffer(JCR_ROOT).append(answerHome.getPath()).append("/element(*,exo:answer)[@exo:approveResponses='true' and @exo:activateResponses='true']");
+    StringBuilder queryString = Utils.createSQLQueryByPath(EXO_ANSWER, answerHome.getPath(), true);
+    queryString.append(" AND ").append(EXO_ACTIVATE_RESPONSES).append(" = 'true' AND ")
+               .append(EXO_APPROVE_RESPONSES).append(" = 'true'");
     QueryManager qm = answerHome.getSession().getWorkspace().getQueryManager();
-    Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+    Query query = qm.createQuery(queryString.toString(), Query.SQL);
     QueryResult result = query.execute();
     return result.getNodes();
   }
@@ -3714,8 +3737,9 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     List<QuestionInfo> questionInfoList = new ArrayList<QuestionInfo>();
     if (categoryNode.hasNode(Utils.QUESTION_HOME)) {
       QuestionInfo questionInfo;
-      String strQuery = "[@exo:isActivated='true' and @exo:isApproved='true']";
-      NodeIterator iter = getQuestionsIterator(categoryNode.getNode(Utils.QUESTION_HOME), strQuery, false);
+      StringBuffer strQuery = new StringBuffer().append("(").append(EXO_IS_ACTIVATED)
+                                                .append(" = 'true' AND ").append(EXO_IS_APPROVED).append(" = 'true')");
+      NodeIterator iter = getQuestionsIterator(categoryNode.getNode(Utils.QUESTION_HOME), strQuery.toString(), false);
       Node question;
       while (iter.hasNext()) {
         question = iter.nextNode();
@@ -3761,14 +3785,16 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
       Node node = getUserSettingHome(sProvider);
       if (node.hasNode(userName))
         node.getNode(userName).remove();
-      StringBuilder queryString = new StringBuilder(JCR_ROOT).append("/").append(dataLocator.getFaqCategoriesLocation()).append("//*[");
+      StringBuilder queryString = Utils.createSQLQueryByPath("nt:base", "/" + dataLocator.getFaqCategoriesLocation() , false);
+      queryString.append(" AND (");
       String[] strs = new String[] { EXO_RESPONSE_BY, EXO_COMMENT_BY, EXO_AUTHOR, EXO_USER_WATCHING };
       for (int i = 0; i < strs.length; i++) {
-        queryString.append("@").append(strs[i]).append("='").append(userName).append((i == strs.length - 1) ? "']" : "' or ");
+        queryString.append(strs[i]).append(" = '").append(userName).append((i == strs.length - 1) ? "'" : "' OR ");
       }
+      queryString.append(")");
       Session session = node.getSession();
-      QueryManager qm = session.getWorkspace().getQueryManager();
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      QueryManager qm = node.getSession().getWorkspace().getQueryManager();
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       NodeIterator iter = result.getNodes();
       Node item;
@@ -3791,10 +3817,9 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
       }
       session.save();
       // LastActivity
-      queryString = new StringBuilder(JCR_ROOT).append("/").append(dataLocator.getFaqCategoriesLocation())
-                                               .append("//element(*,").append(EXO_FAQ_QUESTION).append(")[(jcr:contains(@")
-                                               .append(EXO_LAST_ACTIVITY).append(", '").append(userName).append(Utils.HYPHEN).append("*'))]");
-      query = qm.createQuery(queryString.toString(), Query.XPATH);
+      queryString = Utils.createSQLQueryByPath(EXO_FAQ_QUESTION, "/" + dataLocator.getFaqCategoriesLocation(), false);
+      queryString.append(" AND CONTAINS (").append(EXO_LAST_ACTIVITY).append(", '").append(userName).append(Utils.HYPHEN).append("*')");
+      query = qm.createQuery(queryString.toString(), Query.SQL);
       iter = query.execute().getNodes();
       Question question = new Question();
       String info;
@@ -3819,10 +3844,10 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     try {
       Node cateNode = getCategoryNode(sProvider, cateId);
       List<SyndEntry> entries = new ArrayList<SyndEntry>();
-      StringBuilder queryString = new StringBuilder(JCR_ROOT).append(cateNode.getPath()).append("//element(*,exo:faqQuestion)");
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_QUESTION, cateNode.getPath(), false);
       List<String> list = getListCategoryIdPublic(sProvider, cateNode);
       if (!list.isEmpty())
-        queryString.append("[");
+        queryString.append(" AND (");
       PropertyReader reader = new PropertyReader(cateNode);
       if (reader.list(EXO_USER_PRIVATE, new ArrayList<String>()).isEmpty()) {
         if (!list.isEmpty())
@@ -3831,17 +3856,17 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
       boolean isOr = false;
       for (String id : list) {
         if (isOr) {
-          queryString.append(" or (@exo:categoryId='").append(id).append("')");
+          queryString.append(" OR ").append(EXO_CATEGORY_ID).append(" = '").append(id).append("'");
         } else {
-          queryString.append("(@exo:categoryId='").append(id).append("')");
+          queryString.append(EXO_CATEGORY_ID).append(" = '").append(id).append("'");
           isOr = true;
         }
       }
       if (!list.isEmpty())
-        queryString.append("]");
+        queryString.append(")");
 
       QueryManager qm = cateNode.getSession().getWorkspace().getQueryManager();
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       NodeIterator iter = result.getNodes();
       Node nodeQs;
@@ -3872,11 +3897,12 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
 
   private List<String> getListCategoryIdPublic(SessionProvider sProvider, Node cateNode) throws Exception {
     List<String> list = new ArrayList<String>();
-
-    StringBuilder queryString = new StringBuilder(JCR_ROOT).append(cateNode.getPath()).append("//element(*,exo:faqCategory)[@exo:isView='true' and ( not(@exo:userPrivate) or @exo:userPrivate='')]");
-
+    StringBuilder queryString = Utils.createSQLQueryByPath(EXO_FAQ_CATEGORY, cateNode.getPath(), false);
+    queryString.append(" AND ").append(EXO_IS_VIEW).append(" = 'true' AND (")
+               .append(EXO_USER_PRIVATE).append(" IS NULL OR ")
+               .append(EXO_USER_PRIVATE).append(" = '')");
     QueryManager qm = cateNode.getSession().getWorkspace().getQueryManager();
-    Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+    Query query = qm.createQuery(queryString.toString(), Query.SQL);
     QueryResult result = query.execute();
     NodeIterator iter = result.getNodes();
     while (iter.hasNext()) {
@@ -3904,8 +3930,11 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     try {
       Node answerHome = questionNode.getNode(Utils.ANSWER_HOME);
       QueryManager qm = answerHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(answerHome.getPath()).append("//element(*,exo:answer)[(@exo:approveResponses='true') and (@exo:activateResponses='true')]").append("order by @exo:dateResponse ascending");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_ANSWER, answerHome.getPath(), false); 
+      queryString.append(" AND ").append(EXO_APPROVE_RESPONSES).append(" = 'true' AND ")
+                 .append(EXO_ACTIVATE_RESPONSES).append(" = 'true'")
+                 .append(" ORDER BY ").append(EXO_DATE_RESPONSE).append(" ASC");
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       NodeIterator nodeIterator = result.getNodes();
       Node answerNode = null;
@@ -3931,8 +3960,9 @@ public class JCRDataStorage implements DataStorage, FAQNodeTypes {
     try {
       Node commentHome = questionNode.getNode(Utils.COMMENT_HOME);
       QueryManager qm = commentHome.getSession().getWorkspace().getQueryManager();
-      StringBuffer queryString = new StringBuffer(JCR_ROOT).append(commentHome.getPath()).append("//element(*,exo:comment)").append(" order by @exo:dateComment ascending");
-      Query query = qm.createQuery(queryString.toString(), Query.XPATH);
+      StringBuilder queryString = Utils.createSQLQueryByPath(EXO_COMMENT, commentHome.getPath(), false);
+      queryString.append(" ORDER BY ").append(EXO_DATE_COMMENT).append(" ASC");
+      Query query = qm.createQuery(queryString.toString(), Query.SQL);
       QueryResult result = query.execute();
       NodeIterator nodeIterator = result.getNodes();
       Node commentNode = null;
